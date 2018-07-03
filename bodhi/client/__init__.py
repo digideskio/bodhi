@@ -59,6 +59,8 @@ url_option = click.option('--url', envvar='BODHI_URL', default=bindings.BASE_URL
                           callback=_warn_if_url_and_staging_set)
 staging_option = click.option('--staging', help='Use the staging bodhi instance',
                               is_flag=True, default=False)
+debug_option = click.option('--debug', help='Outputs more information for debugging',
+                            is_flag=True, default=False)
 
 
 new_edit_options = [
@@ -81,7 +83,8 @@ new_edit_options = [
                  help='Space or comma-separated list of required Taskotron tasks'),
     click.option('--suggest', help='Post-update user suggestion',
                  type=click.Choice(['logout', 'reboot'])),
-    staging_option]
+    staging_option,
+    debug_option]
 
 
 # Common options for the overrides save and edit command
@@ -94,7 +97,8 @@ save_edit_options = [
     click.option('--user'),
     click.option('--password', hide_input=True),
     staging_option,
-    url_option]
+    url_option,
+    debug_option]
 
 
 # Basic options for pagination of query result
@@ -131,7 +135,8 @@ release_options = [
                                                'archived']),
                  help='The state of the release'),
     staging_option,
-    url_option]
+    url_option,
+    debug_option]
 
 
 def add_options(options):
@@ -209,7 +214,8 @@ def _save_override(url, user, password, staging, edit=False, **kwargs):
         edit (bool): Set to True to edit an existing buildroot override.
         kwargs (dict): Other keyword arguments passed to us by click.
     """
-    client = bindings.BodhiClient(base_url=url, username=user, password=password, staging=staging)
+    client = bindings.BodhiClient(
+        base_url=url, username=user, password=password, staging=staging, debug=kwargs['debug'])
     resp = client.save_override(nvr=kwargs['nvr'],
                                 duration=kwargs['duration'],
                                 notes=kwargs['notes'],
@@ -240,9 +246,10 @@ def composes():
 @composes.command(name='list')
 @handle_errors
 @staging_option
+@debug_option
 @click.option('-v', '--verbose', is_flag=True, default=False, help='Display more information.')
 @url_option
-def list_composes(url, staging, verbose):
+def list_composes(url, staging, verbose, debug):
     # User docs for the CLI
     """
     List composes.
@@ -257,7 +264,7 @@ def list_composes(url, staging, verbose):
         staging (bool): Whether to use the staging server or not.
         verbose (bool): Whether to show verbose output or not.
     """
-    client = bindings.BodhiClient(base_url=url, staging=staging)
+    client = bindings.BodhiClient(base_url=url, staging=staging, debug=debug)
     print_resp(client.list_composes(), client, verbose)
 
 
@@ -295,7 +302,8 @@ def new(user, password, url, **kwargs):
     """
 
     client = bindings.BodhiClient(base_url=url, username=user, password=password,
-                                  staging=kwargs['staging'])
+                                  staging=kwargs['staging'], debug=kwargs['debug'])
+    kwargs.pop('debug')
 
     if kwargs['file'] is None:
         updates = [kwargs]
@@ -360,7 +368,8 @@ def edit(user, password, url, **kwargs):
         kwargs (dict): Other keyword arguments passed to us by click.
     """
     client = bindings.BodhiClient(base_url=url, username=user, password=password,
-                                  staging=kwargs['staging'])
+                                  staging=kwargs['staging'], debug=kwargs['debug'])
+    kwargs.pop('debug')
 
     kwargs['notes'] = _get_notes(**kwargs)
 
@@ -413,6 +422,7 @@ def edit(user, password, url, **kwargs):
 @click.option('--user', help='Updates submitted by a specific user')
 @click.option('--mine', is_flag=True, help='Show only your updates')
 @staging_option
+@debug_option
 @url_option
 @add_options(pagination_options)
 @handle_errors
@@ -435,7 +445,9 @@ def query(url, mine=False, rows=None, **kwargs):
         mine (Boolean): If the --mine flag was set
         kwargs (dict): Other keyword arguments passed to us by click.
     """
-    client = bindings.BodhiClient(base_url=url, staging=kwargs['staging'])
+    client = bindings.BodhiClient(base_url=url, staging=kwargs['staging'], debug=kwargs['debug'])
+    kwargs.pop('debug')
+
     if mine:
         client.init_username()
         kwargs['user'] = client.username
@@ -449,6 +461,7 @@ def query(url, mine=False, rows=None, **kwargs):
 @click.option('--user')
 @click.option('--password', hide_input=True)
 @staging_option
+@debug_option
 @url_option
 @handle_errors
 def request(update, state, user, password, url, **kwargs):
@@ -477,7 +490,7 @@ def request(update, state, user, password, url, **kwargs):
         kwargs (dict): Other keyword arguments passed to us by click.
     """
     client = bindings.BodhiClient(base_url=url, username=user, password=password,
-                                  staging=kwargs['staging'])
+                                  staging=kwargs['staging'], debug=kwargs['debug'])
 
     try:
         resp = client.request(update, state)
@@ -494,6 +507,7 @@ def request(update, state, user, password, url, **kwargs):
 @click.option('--user')
 @click.option('--password', hide_input=True)
 @staging_option
+@debug_option
 @url_option
 @handle_errors
 def comment(update, text, karma, user, password, url, **kwargs):
@@ -522,13 +536,14 @@ def comment(update, text, karma, user, password, url, **kwargs):
     """
 
     client = bindings.BodhiClient(base_url=url, username=user, password=password,
-                                  staging=kwargs['staging'])
+                                  staging=kwargs['staging'], debug=kwargs['debug'])
     resp = client.comment(update, text, karma)
     print_resp(resp, client)
 
 
 @updates.command()
 @staging_option
+@debug_option
 @click.option('--arch', help='Specify arch of packages to download, ' +
               '"all" will retrieve packages from all architectures')
 @click.option('--cves', help='Download update(s) by CVE(s) (comma-separated list)')
@@ -551,7 +566,8 @@ def download(url, **kwargs):
                        True.
         kwargs (dict): Other keyword arguments passed to us by click.
     """
-    client = bindings.BodhiClient(base_url=url, staging=kwargs['staging'])
+    client = bindings.BodhiClient(base_url=url, staging=kwargs['staging'], debug=kwargs['debug'])
+    kwargs.pop('debug')
     requested_arch = kwargs['arch']
 
     del(kwargs['staging'])
@@ -634,6 +650,7 @@ def overrides():
 @click.option('--user', default=None,
               help='Overrides submitted by a specific user')
 @staging_option
+@debug_option
 @click.option('--mine', is_flag=True,
               help='Show only your overrides.')
 @click.option('--packages', default=None,
@@ -670,7 +687,7 @@ def query_buildroot_overrides(url, user=None, mine=False, packages=None,
         page (unicode): If supplied, returns the results for a specific page number.
         kwargs (dict): Other keyword arguments passed to us by click.
     """
-    client = bindings.BodhiClient(base_url=url, staging=kwargs['staging'])
+    client = bindings.BodhiClient(base_url=url, staging=kwargs['staging'], debug=kwargs['debug'])
     if mine:
         client.init_username()
         user = client.username
@@ -831,7 +848,8 @@ def releases():
 def create_release(username, password, url, **kwargs):
     """Create a release."""
     client = bindings.BodhiClient(base_url=url, username=username, password=password,
-                                  staging=kwargs['staging'])
+                                  staging=kwargs['staging'], debug=kwargs['debug'])
+    kwargs.pop('debug')
     kwargs['csrf_token'] = client.csrf()
 
     save(client, **kwargs)
@@ -844,7 +862,8 @@ def create_release(username, password, url, **kwargs):
 def edit_release(username, password, url, **kwargs):
     """Edit an existing release."""
     client = bindings.BodhiClient(base_url=url, username=username, password=password,
-                                  staging=kwargs['staging'])
+                                  staging=kwargs['staging'], debug=kwargs['debug'])
+    kwargs.pop('debug')
     csrf = client.csrf()
 
     edited = kwargs.pop('name')
@@ -880,9 +899,10 @@ def edit_release(username, password, url, **kwargs):
 @click.argument('name')
 @url_option
 @staging_option
+@debug_option
 def info_release(name, url, **kwargs):
     """Retrieve and print info about a named release."""
-    client = bindings.BodhiClient(base_url=url, staging=kwargs['staging'])
+    client = bindings.BodhiClient(base_url=url, staging=kwargs['staging'], debug=kwargs['debug'])
 
     res = client.send_request('releases/%s' % name, verb='GET', auth=False)
 

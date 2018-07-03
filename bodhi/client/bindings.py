@@ -152,7 +152,8 @@ def _days_since(data_str):
 class BodhiClient(OpenIdBaseClient):
     """Python bindings to the Bodhi server REST API."""
 
-    def __init__(self, base_url=BASE_URL, username=None, password=None, staging=False, **kwargs):
+    def __init__(self, base_url=BASE_URL, username=None, password=None, staging=False, debug=False,
+                 **kwargs):
         """
         Initialize the Bodhi client.
 
@@ -162,6 +163,7 @@ class BodhiClient(OpenIdBaseClient):
             username (basestring): The username to use to authenticate with the server.
             password (basestring): The password to use to authenticate with the server.
             staging (bool): If True, use the staging server. If False, use base_url.
+            debug (bool): Set the logging to debug level.
             kwargs (dict): Other keyword arguments to pass on to
                            :class:`fedora.client.OpenIdBaseClient`
         """
@@ -171,6 +173,12 @@ class BodhiClient(OpenIdBaseClient):
 
         if base_url[-1] != '/':
             base_url = base_url + '/'
+
+        if debug:
+            ch = logging.StreamHandler()
+            ch.setLevel(logging.DEBUG)
+            log.addHandler(ch)
+            log.setLevel(logging.DEBUG)
 
         super(BodhiClient, self).__init__(base_url, login_url=base_url + 'login', username=username,
                                           **kwargs)
